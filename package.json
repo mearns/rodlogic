@@ -2,6 +2,20 @@
   "name": "PROJECT-NAME",
   "version": "0.1.0",
   "description": "$PROJECT_DESCRIPTION$",
+  "keywords": [],
+  "author": "Brian Mearns <mearns.b@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearns/PROJECT-NAME.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mearns/PROJECT-NAME/issues"
+  },
+  "homepage": "https://github.com/mearns/PROJECT-NAME#readme",
+  "engines": {
+    "node": "^10.9.0"
+  },
   "main": "src/index.js",
   "files": [
     "src/**/*"
@@ -14,14 +28,8 @@
     "test": "nyc npm run test-only",
     "test-only": "mocha test/src/",
     "verify": "npm run check && npm run test",
-    "run": "node ."
+    "start": "node ."
   },
-  "engines": {
-    "node": "^10.9.0"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "husky": {
     "hooks": {
       "pre-commit": "npm run pretty -s"

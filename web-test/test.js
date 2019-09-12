@@ -2,27 +2,53 @@ class RodArtist {
     constructor(ctx, rodCount) {
         this.ctx = ctx;
         this.rodCount = rodCount;
-        this.spacing = 3;
+        this.spacing = 4;
         this.rodLength = this.spacing * rodCount + 3 + 1;
         this.cellCount = this.rodLength + 1 + 1 + 0.5;
     }
 
+    drawValueHighlight(orientation) {
+        let x, y, dx, dy;
+        if (!orientation) {
+            // vertical plane
+            x = 4 + this.spacing - 1 - 0.5;
+            y = 2;
+            dx = 1;
+            dy = 0;
+        } else {
+            // horizontal plane
+            x = 2;
+            y = 1 + 3 + this.spacing - 1 - 0.5;
+            dx = 0;
+            dy = 1;
+        }
+        this.ctx.save();
+        this.ctx.fillStyle = "#cccc4860";
+        this.ctx.strokeStyle = tinycolor(this.ctx.fillStyle).darken(25);
+        this.ctx.lineWidth = 0.1;
+        ["strokeRect", "fillRect"].forEach(method => {
+            this.ctx[method](
+                x,
+                y,
+                dx * (this.rodLength - 3 - this.spacing + 1) + dy,
+                dy * (this.rodLength - 3 - this.spacing + 1) + dx
+            );
+        });
+        this.ctx.restore();
+    }
+
     drawRod(orientation, index, color, blocks, value = 0) {
-        let x, y, w, h, dx, dy;
+        let x, y, dx, dy;
         if (orientation) {
             // horizontal
             x = 1;
             y = 3 + this.spacing * (index + 1);
-            w = this.rodLength;
-            h = 1;
             dx = 1;
             dy = 0;
         } else {
             // vertical
             x = 3 + this.spacing * (index + 1);
             y = 1;
-            w = 1;
-            h = this.rodLength;
             dx = 0;
             dy = 1;
         }
@@ -105,6 +131,7 @@ class Layer {
                 values[i]
             );
         }
+        artists.drawValueHighlight(this.orientation);
     }
 }
 

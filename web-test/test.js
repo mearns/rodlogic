@@ -1,38 +1,59 @@
+const TAB_SIZE = 3;
+const MARGIN = 1;
+
 class RodArtist {
     constructor(ctx, rodCount) {
         this.ctx = ctx;
         this.rodCount = rodCount;
         this.spacing = 4;
-        this.rodLength = this.spacing * rodCount + 3 + 1;
-        this.cellCount = this.rodLength + 1 + 1 + 0.5;
+        this.rodLength = this.spacing * rodCount + TAB_SIZE;
+        this.cellCount = this.rodLength + MARGIN + MARGIN + 0.5 * MARGIN;
     }
 
-    drawValueHighlight(orientation) {
-        let x, y, dx, dy;
-        if (!orientation) {
-            // vertical plane
-            x = 4 + this.spacing - 1 - 0.5;
-            y = 2;
-            dx = 1;
-            dy = 0;
-        } else {
-            // horizontal plane
-            x = 2;
-            y = 1 + 3 + this.spacing - 1 - 0.5;
-            dx = 0;
-            dy = 1;
+    getRodPosition(orientation, index) {
+        const a = 1;
+        const b = 3 + this.spacing * (index + 1);
+        return this.orientValues(orientation, a, b);
+    }
+
+    getVector(orientation) {
+        return this.orientValues(orientation, 1, 0);
+    }
+
+    orientValues(orientation, a, b) {
+        if (orientation) {
+            return [a, b];
         }
+        return [b, a];
+    }
+
+    orientVector(orientation, xComponent, yComponent) {
+        const [dx, dy] = this.getVector(orientation);
+        return [
+            dx * xComponent + dy * yComponent,
+            dy * xComponent + dx * yComponent
+        ];
+    }
+
+    drawValueHighlight(orientation, color) {
+        const [dx, dy] = this.getVector(!orientation);
+        const [x, y] = this.orientVector(
+            !orientation,
+            TAB_SIZE + this.spacing - 0.5,
+            MARGIN + 1
+        );
+        const [w, h] = this.orientVector(
+            !orientation,
+            this.rodLength - TAB_SIZE - this.spacing + 2,
+            1
+        );
         this.ctx.save();
-        this.ctx.fillStyle = "#cccc4860";
-        this.ctx.strokeStyle = tinycolor(this.ctx.fillStyle).darken(25);
+        const tc = tinycolor(color).setAlpha(0.75);
+        this.ctx.fillStyle = tc.toString();
+        this.ctx.strokeStyle = tc.darken(25).toString();
         this.ctx.lineWidth = 0.1;
         ["strokeRect", "fillRect"].forEach(method => {
-            this.ctx[method](
-                x,
-                y,
-                dx * (this.rodLength - 3 - this.spacing + 1) + dy,
-                dy * (this.rodLength - 3 - this.spacing + 1) + dx
-            );
+            this.ctx[method](x, y, w, h);
         });
         this.ctx.restore();
     }
@@ -131,7 +152,7 @@ class Layer {
                 values[i]
             );
         }
-        artists.drawValueHighlight(this.orientation);
+        artists.drawValueHighlight(this.orientation, this.color);
     }
 }
 

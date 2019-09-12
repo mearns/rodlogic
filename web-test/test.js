@@ -2,7 +2,7 @@ class RodArtist {
     constructor(ctx, rodCount) {
         this.ctx = ctx;
         this.rodCount = rodCount;
-        this.rodLength = 3 * rodCount + 2;
+        this.rodLength = 3 * rodCount + 2 + 1;
         this.cellCount = this.rodLength + 1 + 1;
     }
 
@@ -11,14 +11,14 @@ class RodArtist {
         if (orientation) {
             // horizontal
             x = 1;
-            y = 1 + 3 * (index + 1);
+            y = 2 + 3 * (index + 1);
             w = this.rodLength;
             h = 1;
             dx = 1;
             dy = 0;
         } else {
             // vertical
-            x = 1 + 3 * (index + 1);
+            x = 2 + 3 * (index + 1);
             y = 1;
             w = 1;
             h = this.rodLength;
@@ -29,37 +29,54 @@ class RodArtist {
             x += dx;
             y += dy;
         }
+        this.ctx.save();
+        this.ctx.translate(x, y);
         this.ctx.fillStyle = color;
+        this.ctx.strokeStyle = tinycolor(color).darken(50);
         this.ctx.lineWidth = 0.1;
-        // this.ctx.strokeRect(x, y, w, h);
-        this.ctx.fillRect(
-            x + 0.25 * dy,
-            y + 0.25 * dx,
-            w - (w / 2) * dy,
-            h - (h / 2) * dx
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(2 * dx, 2 * dy);
+        this.ctx.lineTo(2 * dx + 0.25, 2 * dy + 0.25);
+        this.ctx.lineTo(
+            dx * this.rodLength + 0.25 * dy,
+            dy * this.rodLength + 0.25 * dx
         );
+        this.ctx.lineTo(
+            dx * this.rodLength + 0.75 * dy,
+            dy * this.rodLength + 0.75 * dx
+        );
+        this.ctx.lineTo(2 * dx + 0.25 + 0.5 * dy, 2 * dy + 0.25 + 0.5 * dx);
+        this.ctx.lineTo(2 * dx + dy, 2 * dy + dx);
+        this.ctx.lineTo(dy, dx);
+        this.ctx.lineTo(0, 0);
+        this.ctx.stroke();
+        this.ctx.fill();
 
         this.ctx.fillStyle = tinycolor
             .mostReadable(color, ["white", "black"])
             .toString();
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText("0", x + dx + 0.5, y + dy + 0.5, 1);
-        this.ctx.fillText("1", x + 0.5, y + 0.5, 1);
+        this.ctx.fillText("0", dx + 0.5, dy + 0.5, 1);
+        this.ctx.fillText("1", 0.5, 0.5, 1);
 
         if (blocks) {
             this.ctx.fillStyle = tinycolor(color).darken(25);
+            this.ctx.strokeStyle = tinycolor(color).darken(50);
             for (let i = 0; i < this.rodCount; i++) {
                 if (blocks === true || blocks[i]) {
-                    this.ctx.fillRect(
-                        x + dx * (3 * i + 2),
-                        y + dy * (3 * i + 2),
+                    this.ctx.strokeRect(
+                        dx * (3 * i + 3),
+                        dy * (3 * i + 3),
                         1,
                         1
                     );
+                    this.ctx.fillRect(dx * (3 * i + 3), dy * (3 * i + 3), 1, 1);
                 }
             }
         }
+        this.ctx.restore();
     }
 }
 

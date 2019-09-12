@@ -5,15 +5,9 @@ class RodArtist {
     constructor(ctx, rodCount) {
         this.ctx = ctx;
         this.rodCount = rodCount;
-        this.spacing = 4;
+        this.spacing = 2;
         this.rodLength = this.spacing * rodCount + TAB_SIZE;
         this.cellCount = this.rodLength + MARGIN + MARGIN + 0.5 * MARGIN;
-    }
-
-    getRodPosition(orientation, index) {
-        const a = 1;
-        const b = 3 + this.spacing * (index + 1);
-        return this.orientValues(orientation, a, b);
     }
 
     /**
@@ -29,6 +23,14 @@ class RodArtist {
         return [b, a];
     }
 
+    getRodPosition(orientation, index, value = 0) {
+        return this.orientValues(
+            orientation,
+            MARGIN + (value ? 1 : 0),
+            TAB_SIZE + this.spacing * (index + 1)
+        );
+    }
+
     /**
      * Draw a translucent bar to highlight the current
      * values of a set of rods.
@@ -40,7 +42,7 @@ class RodArtist {
         const [x, y] = this.orientValues(
             !orientation,
             TAB_SIZE + this.spacing - 0.5,
-            MARGIN + 1
+            MARGIN + 1 + 0.1
         );
         const NUMBER_OF_VALUE_POSITIONS = 2;
         const POSITION_OF_LAST_VALUE = NUMBER_OF_VALUE_POSITIONS - 1;
@@ -51,7 +53,7 @@ class RodArtist {
                 this.spacing +
                 MARGIN +
                 POSITION_OF_LAST_VALUE,
-            1
+            0.8
         );
         this.ctx.save();
         const tc = tinycolor(color).setAlpha(0.75);
@@ -65,11 +67,7 @@ class RodArtist {
     }
 
     drawRod(orientation, index, color, blocks, value = 0) {
-        let [x, y] = this.orientValues(
-            orientation,
-            MARGIN + (value ? 1 : 0),
-            TAB_SIZE + this.spacing * (index + 1)
-        );
+        const [x, y] = this.getRodPosition(orientation, index, value);
         this.ctx.save();
         this.ctx.translate(x, y);
         this.ctx.fillStyle = color;
@@ -103,24 +101,34 @@ class RodArtist {
         this.ctx.textBaseline = "middle";
         this.ctx.fillText("1", 0.5, 0.5, 1);
         this.ctx.fillText("0", ...this.orientValues(orientation, 1.5, 0.5), 1);
+        this.ctx.restore();
 
         if (blocks) {
-            this.ctx.fillStyle = tinycolor(color).darken(25);
-            this.ctx.strokeStyle = tinycolor(color).darken(50);
-            for (let i = 0; i < this.rodCount; i++) {
-                if (blocks === true || blocks[i]) {
-                    ["strokeRect", "fillRect"].forEach(method => {
-                        this.ctx[method](
-                            ...this.orientValues(
-                                orientation,
-                                0.1 + (this.spacing * (i + 1) + 1),
-                                0.1
-                            ),
-                            0.8,
-                            0.8
-                        );
-                    });
-                }
+            this.drawBlocks(orientation, index, value, blocks, color);
+        }
+    }
+
+    drawBlocks(orientation, rodIndex, rodValue, blocks, color) {
+        this.ctx.save();
+        this.ctx.lineWidth = 0.1;
+        this.ctx.translate(
+            ...this.getRodPosition(orientation, rodIndex, rodValue)
+        );
+        this.ctx.fillStyle = tinycolor(color).darken(25);
+        this.ctx.strokeStyle = tinycolor(color).darken(50);
+        for (let i = 0; i < this.rodCount; i++) {
+            if (blocks === true || blocks[i]) {
+                ["strokeRect", "fillRect"].forEach(method => {
+                    this.ctx[method](
+                        ...this.orientValues(
+                            orientation,
+                            0.1 + (this.spacing * (i + 1) + 1),
+                            0.1
+                        ),
+                        0.8,
+                        0.8
+                    );
+                });
             }
         }
         this.ctx.restore();

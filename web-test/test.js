@@ -2,8 +2,9 @@ class RodArtist {
     constructor(ctx, rodCount) {
         this.ctx = ctx;
         this.rodCount = rodCount;
-        this.rodLength = 3 * rodCount + 2 + 1;
-        this.cellCount = this.rodLength + 1 + 1;
+        this.spacing = 3;
+        this.rodLength = this.spacing * rodCount + 3 + 1;
+        this.cellCount = this.rodLength + 1 + 1 + 0.5;
     }
 
     drawRod(orientation, index, color, blocks, value = 0) {
@@ -11,14 +12,14 @@ class RodArtist {
         if (orientation) {
             // horizontal
             x = 1;
-            y = 2 + 3 * (index + 1);
+            y = 3 + this.spacing * (index + 1);
             w = this.rodLength;
             h = 1;
             dx = 1;
             dy = 0;
         } else {
             // vertical
-            x = 2 + 3 * (index + 1);
+            x = 3 + this.spacing * (index + 1);
             y = 1;
             w = 1;
             h = this.rodLength;
@@ -66,13 +67,14 @@ class RodArtist {
             this.ctx.strokeStyle = tinycolor(color).darken(50);
             for (let i = 0; i < this.rodCount; i++) {
                 if (blocks === true || blocks[i]) {
-                    this.ctx.strokeRect(
-                        dx * (3 * i + 3),
-                        dy * (3 * i + 3),
-                        1,
-                        1
-                    );
-                    this.ctx.fillRect(dx * (3 * i + 3), dy * (3 * i + 3), 1, 1);
+                    ["strokeRect", "fillRect"].forEach(method => {
+                        this.ctx[method](
+                            0.1 + dx * (this.spacing * i + this.spacing + 1),
+                            0.1 + dy * (this.spacing * i + this.spacing + 1),
+                            0.8,
+                            0.8
+                        );
+                    });
                 }
             }
         }

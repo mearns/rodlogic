@@ -16,10 +16,12 @@ class RodArtist {
         return this.orientValues(orientation, a, b);
     }
 
-    getVector(orientation) {
-        return this.orientValues(orientation, 1, 0);
-    }
-
+    /**
+     * Given an orientation and a pair of vector components
+     * along the length of the rod and the width of the rod, respectively,
+     * returns an array of two values for the X dimension and the Y
+     * dimension.
+     */
     orientValues(orientation, a, b) {
         if (orientation) {
             return [a, b];
@@ -27,24 +29,28 @@ class RodArtist {
         return [b, a];
     }
 
-    orientVector(orientation, xComponent, yComponent) {
-        const [dx, dy] = this.getVector(orientation);
-        return [
-            dx * xComponent + dy * yComponent,
-            dy * xComponent + dx * yComponent
-        ];
-    }
-
+    /**
+     * Draw a translucent bar to highlight the current
+     * values of a set of rods.
+     * @param {boolean} orientation The orientation of the rods
+     * in the layer, not of the highlight itself.
+     * @param {*} color
+     */
     drawValueHighlight(orientation, color) {
-        const [dx, dy] = this.getVector(!orientation);
-        const [x, y] = this.orientVector(
+        const [x, y] = this.orientValues(
             !orientation,
             TAB_SIZE + this.spacing - 0.5,
             MARGIN + 1
         );
-        const [w, h] = this.orientVector(
+        const NUMBER_OF_VALUE_POSITIONS = 2;
+        const POSITION_OF_LAST_VALUE = NUMBER_OF_VALUE_POSITIONS - 1;
+        const [w, h] = this.orientValues(
             !orientation,
-            this.rodLength - TAB_SIZE - this.spacing + 2,
+            this.rodLength -
+                TAB_SIZE -
+                this.spacing +
+                MARGIN +
+                POSITION_OF_LAST_VALUE,
             1
         );
         this.ctx.save();
@@ -59,24 +65,11 @@ class RodArtist {
     }
 
     drawRod(orientation, index, color, blocks, value = 0) {
-        let x, y, dx, dy;
-        if (orientation) {
-            // horizontal
-            x = 1;
-            y = 3 + this.spacing * (index + 1);
-            dx = 1;
-            dy = 0;
-        } else {
-            // vertical
-            x = 3 + this.spacing * (index + 1);
-            y = 1;
-            dx = 0;
-            dy = 1;
-        }
-        if (value) {
-            x += dx;
-            y += dy;
-        }
+        let [x, y] = this.orientValues(
+            orientation,
+            MARGIN + (value ? 1 : 0),
+            TAB_SIZE + this.spacing * (index + 1)
+        );
         this.ctx.save();
         this.ctx.translate(x, y);
         this.ctx.fillStyle = color;
@@ -84,19 +77,21 @@ class RodArtist {
         this.ctx.lineWidth = 0.1;
         this.ctx.beginPath();
         this.ctx.moveTo(0, 0);
-        this.ctx.lineTo(2 * dx, 2 * dy);
-        this.ctx.lineTo(2 * dx + 0.25, 2 * dy + 0.25);
+        this.ctx.lineTo(...this.orientValues(orientation, TAB_SIZE - 1, 0));
         this.ctx.lineTo(
-            dx * this.rodLength + 0.25 * dy,
-            dy * this.rodLength + 0.25 * dx
+            ...this.orientValues(orientation, TAB_SIZE - 1 + 0.25, 0.25)
         );
         this.ctx.lineTo(
-            dx * this.rodLength + 0.75 * dy,
-            dy * this.rodLength + 0.75 * dx
+            ...this.orientValues(orientation, this.rodLength, 0.25)
         );
-        this.ctx.lineTo(2 * dx + 0.25 + 0.5 * dy, 2 * dy + 0.25 + 0.5 * dx);
-        this.ctx.lineTo(2 * dx + dy, 2 * dy + dx);
-        this.ctx.lineTo(dy, dx);
+        this.ctx.lineTo(
+            ...this.orientValues(orientation, this.rodLength, 0.75)
+        );
+        this.ctx.lineTo(
+            ...this.orientValues(orientation, TAB_SIZE - 1 + 0.25, 0.75)
+        );
+        this.ctx.lineTo(...this.orientValues(orientation, TAB_SIZE - 1, 1));
+        this.ctx.lineTo(...this.orientValues(orientation, 0, 1));
         this.ctx.lineTo(0, 0);
         this.ctx.stroke();
         this.ctx.fill();
@@ -106,8 +101,8 @@ class RodArtist {
             .toString();
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText("0", dx + 0.5, dy + 0.5, 1);
         this.ctx.fillText("1", 0.5, 0.5, 1);
+        this.ctx.fillText("0", ...this.orientValues(orientation, 1.5, 0.5), 1);
 
         if (blocks) {
             this.ctx.fillStyle = tinycolor(color).darken(25);
@@ -116,8 +111,11 @@ class RodArtist {
                 if (blocks === true || blocks[i]) {
                     ["strokeRect", "fillRect"].forEach(method => {
                         this.ctx[method](
-                            0.1 + dx * (this.spacing * i + this.spacing + 1),
-                            0.1 + dy * (this.spacing * i + this.spacing + 1),
+                            ...this.orientValues(
+                                orientation,
+                                0.1 + (this.spacing * (i + 1) + 1),
+                                0.1
+                            ),
                             0.8,
                             0.8
                         );

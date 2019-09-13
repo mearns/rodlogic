@@ -276,26 +276,6 @@ class Layer {
     }
 }
 
-async function renderOnCanvas(canvas) {
-    const computer = new Computer(
-        4,
-        // prettier-ignore
-        [
-            [0, 0, 0, 0],
-            [0, 1, 0, 0],
-            [1, 0, 0, 0],
-            [1, 1, 1, 1]
-        ],
-        // prettier-ignore
-        [
-            [0, 1, 1, 1],
-            [0, 0, 0, 0]
-        ]
-    );
-    await computer.animate(canvas, 500, [0, 1, 0, 0]);
-    console.log("Done");
-}
-
 class Computer {
     constructor(...rodLayers) {
         this.layers = rodLayers.map(
@@ -311,37 +291,68 @@ class Computer {
         const ctx = canvas.getContext("2d");
         const artist = new RodArtist(ctx, this.rodCount);
         let i = 1;
+        let drawBlocksForNext = false;
         const animator = new Animator(() => {
             ctx.clearRect(0, 0, width, height);
             ctx.save();
             ctx.scale(width / artist.cellCount, height / artist.cellCount);
             ctx.font = `${100 / 10 / artist.cellCount}px serif`;
-            this.layers[i].draw(artist);
+            this.layers[i].draw(artist, drawBlocksForNext);
             this.layers[i - 1].draw(artist, true);
             ctx.restore();
         });
         ready = ready || (() => animator.pause(frameDuration));
 
-        this.layers[0].setValues(inputs);
-        await animator.animate(frameDuration, pct => {
-            this.layers[i - 1].setPct(pct);
+        const step = async (description, cb) => {
+            console.log(description);
+            await cb();
+            await ready();
+        };
+
+        await animator.draw();
+        await ready();
+
+        await step(`Seting inputs to ${inputs}`, async () => {
+            this.layers[0].setValues(inputs);
+            await animator.animate(frameDuration, pct => {
+                this.layers[i - 1].setPct(pct);
+            });
         });
 
         for (i = i; i < this.layers.length; i++) {
-            await ready();
+            if (i > 1) {
+                await step("Next layer", async () => {
+                    drawBlocksForNext = false;
+                    await animator.draw();
+                });
+            }
 
-            this.layers[i].setValues(
-                this.layers[i].computeValues(this.layers[i - 1].getValues())
+            const computedValues = this.layers[i].computeValues(
+                this.layers[i - 1].getValues()
             );
-            await animator.animate(frameDuration, pct => {
-                this.layers[i].setPct(pct);
-            });
-            await ready();
+            await step(
+                `Push output layer to compute value: ${computedValues}`,
+                async () => {
+                    this.layers[i].setValues(computedValues);
+                    await animator.animate(frameDuration, pct => {
+                        this.layers[i].setPct(pct);
+                    });
+                }
+            );
 
             // Fly out
             if (i + 1 < this.layers.length) {
-                await animator.animate(frameDuration, pct =>
-                    this.layers[i - 1].setFlyout(pct)
+                await step("Shed layer", async () => {
+                    await animator.animate(frameDuration, pct =>
+                        this.layers[i - 1].setFlyout(pct)
+                    );
+                });
+                await step(
+                    "Output layer becomes the next input layer (hide gates and show blocks)",
+                    async () => {
+                        drawBlocksForNext = true;
+                        animator.draw();
+                    }
                 );
             }
         }
@@ -358,6 +369,10 @@ class Animator {
         return new Promise(resolve => {
             setTimeout(resolve, duration);
         });
+    }
+
+    async draw() {
+        this._render();
     }
 
     async animate(duration, cb) {
@@ -379,11 +394,32 @@ class Animator {
     }
 }
 
-function main() {
+async function main() {
     const canvas = document.getElementById("canvas");
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
-    renderOnCanvas(canvas);
+    const ready = () => {
+        return new Promise(resolve => {
+            window.addEventListener("keypress", resolve, { once: true });
+        });
+    };
+    const computer = new Computer(
+        4,
+        // prettier-ignore
+        [
+            [0, 0, 0, 0],
+            [0, 1, 0, 0],
+            [1, 0, 0, 0],
+            [1, 1, 1, 1]
+        ],
+        // prettier-ignore
+        [
+            [0, 1, 1, 1],
+            [0, 0, 0, 0]
+        ]
+    );
+    await computer.animate(canvas, 500, [0, 1, 0, 0], ready);
+    console.log("Done");
 }
 
 let resized = false;

@@ -194,15 +194,22 @@ class Layer {
         }
         this.orientation = orientation;
         this.color = color;
+        this.values = new Array(this.rodCount).fill(0);
     }
 
-    draw(artist, input = false, values = []) {
+    setValues(values) {
+        for (let i = 0; i < values.length; i++) {
+            this.values[i] = values[i];
+        }
+    }
+
+    draw(artist, input = false) {
         for (let i = 0; i < this.rodCount; i++) {
             const drawBlocks = blocks => {
                 artist.drawBlocks(
                     this.orientation,
                     i,
-                    values[i],
+                    this.values[i],
                     blocks,
                     this.color
                 );
@@ -210,7 +217,7 @@ class Layer {
             if (input) {
                 drawBlocks(true);
             }
-            artist.drawRod(this.orientation, i, this.color, values[i]);
+            artist.drawRod(this.orientation, i, this.color, this.values[i]);
             if (!input) {
                 drawBlocks(this.rods[i]);
             }
@@ -219,7 +226,7 @@ class Layer {
     }
 }
 
-function renderOnCanvas(canvas) {
+async function renderOnCanvas(canvas) {
     const width = canvas.width;
     const height = canvas.height;
     const ctx = canvas.getContext("2d");
@@ -237,28 +244,46 @@ function renderOnCanvas(canvas) {
         false,
         "#ccccff"
     );
-    animate(500, pct => {
+
+    const animator = new Animator(() => {
         ctx.clearRect(0, 0, width, height);
         ctx.save();
         ctx.scale(width / artist.cellCount, height / artist.cellCount);
         ctx.font = `${100 / 10 / artist.cellCount}px serif`;
         outputLayer.draw(artist);
-        inputLayer.draw(artist, true, [0, pct, 0, 0]);
+        inputLayer.draw(artist, true);
         ctx.restore();
+    });
+    await animator.animate(500, pct => {
+        inputLayer.setValues([0, 0, pct, 0]);
+    });
+    await animator.animate(500, pct => {
+        outputLayer.setValues([pct, pct, pct, 0]);
     });
 }
 
-function animate(duration, cb) {
-    const startTime = new Date().getTime();
-    const drawFrame = () => {
-        const elapsedTimed = new Date() - startTime;
-        const pct = elapsedTimed / duration;
-        cb(pct > 1 ? 1 : pct);
-        if (pct < 1) {
+class Animator {
+    constructor(render) {
+        this._render = render;
+    }
+
+    async animate(duration, cb) {
+        return new Promise(resolve => {
+            const startTime = new Date().getTime();
+            const drawFrame = () => {
+                const elapsedTimed = new Date() - startTime;
+                const pct = elapsedTimed / duration;
+                cb(pct > 1 ? 1 : pct);
+                this._render();
+                if (pct < 1) {
+                    requestAnimationFrame(drawFrame);
+                } else {
+                    resolve();
+                }
+            };
             requestAnimationFrame(drawFrame);
-        }
-    };
-    requestAnimationFrame(drawFrame);
+        });
+    }
 }
 
 function main() {

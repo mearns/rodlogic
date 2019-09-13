@@ -305,7 +305,7 @@ class Computer {
         this.rodCount = Math.max(...this.layers.map(layer => layer.rodCount));
     }
 
-    async animate(canvas, frameDuration, inputs) {
+    async animate(canvas, frameDuration, inputs, ready) {
         const width = canvas.width;
         const height = canvas.height;
         const ctx = canvas.getContext("2d");
@@ -320,30 +320,30 @@ class Computer {
             this.layers[i - 1].draw(artist, true);
             ctx.restore();
         });
+        ready = ready || (() => animator.pause(frameDuration));
+
         this.layers[0].setValues(inputs);
+        await animator.animate(frameDuration, pct => {
+            this.layers[i - 1].setPct(pct);
+        });
 
         for (i = i; i < this.layers.length; i++) {
-            if (i == 1) {
-                await animator.animate(frameDuration, pct => {
-                    this.layers[i - 1].setPct(pct);
-                });
-            } else {
-                await animator.pause(frameDuration);
-            }
+            await ready();
 
-            const outputValues = this.layers[i].computeValues(
-                this.layers[i - 1].getValues()
+            this.layers[i].setValues(
+                this.layers[i].computeValues(this.layers[i - 1].getValues())
             );
-            this.layers[i].setValues(outputValues);
             await animator.animate(frameDuration, pct => {
                 this.layers[i].setPct(pct);
             });
-            await animator.pause(frameDuration);
+            await ready();
 
             // Fly out
-            await animator.animate(frameDuration, pct =>
-                this.layers[i - 1].setFlyout(pct)
-            );
+            if (i + 1 < this.layers.length) {
+                await animator.animate(frameDuration, pct =>
+                    this.layers[i - 1].setFlyout(pct)
+                );
+            }
         }
     }
 }

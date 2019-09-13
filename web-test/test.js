@@ -277,17 +277,23 @@ class Layer {
 }
 
 async function renderOnCanvas(canvas) {
-    const rodCount = 4;
-    const inputLayer = rodCount;
-    const outputLayer = [
+    const computer = new Computer(
+        4,
         // prettier-ignore
-        [0, 0, 0, 0],
-        [0, 1, 0, 0],
-        [1, 0, 0, 0],
-        [1, 1, 1, 1]
-    ];
-    const computer = new Computer(inputLayer, outputLayer);
+        [
+            [0, 0, 0, 0],
+            [0, 1, 0, 0],
+            [1, 0, 0, 0],
+            [1, 1, 1, 1]
+        ],
+        // prettier-ignore
+        [
+            [0, 1, 1, 1],
+            [0, 0, 0, 0]
+        ]
+    );
     await computer.animate(canvas, 500, [0, 1, 0, 0]);
+    console.log("Done");
 }
 
 class Computer {
@@ -316,21 +322,29 @@ class Computer {
         });
         this.layers[0].setValues(inputs);
 
-        await animator.animate(frameDuration, pct => {
-            this.layers[0].setPct(pct);
-        });
+        for (i = i; i < this.layers.length; i++) {
+            if (i == 1) {
+                await animator.animate(frameDuration, pct => {
+                    this.layers[i - 1].setPct(pct);
+                });
+            } else {
+                await animator.pause(frameDuration);
+            }
 
-        const outputValues = this.layers[1].computeValues(
-            this.layers[0].getValues()
-        );
-        this.layers[1].setValues(outputValues);
-        await animator.animate(frameDuration, pct => {
-            this.layers[1].setPct(pct);
-        });
-        await animator.pause(frameDuration);
+            const outputValues = this.layers[i].computeValues(
+                this.layers[i - 1].getValues()
+            );
+            this.layers[i].setValues(outputValues);
+            await animator.animate(frameDuration, pct => {
+                this.layers[i].setPct(pct);
+            });
+            await animator.pause(frameDuration);
 
-        // Fly out
-        // await animator.animate(500, pct => inputLayer.setFlyout(pct));
+            // Fly out
+            await animator.animate(frameDuration, pct =>
+                this.layers[i - 1].setFlyout(pct)
+            );
+        }
     }
 }
 
@@ -340,6 +354,7 @@ class Animator {
     }
 
     async pause(duration) {
+        this._render();
         return new Promise(resolve => {
             setTimeout(resolve, duration);
         });

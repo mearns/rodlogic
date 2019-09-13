@@ -151,7 +151,7 @@ class RodArtist {
      * @param {string} color The color of the host rod.
      */
     drawBlocks(orientation, rodIndex, rodValue, blocks, color) {
-        const BLOCK_SIZE = 0.9;
+        const BLOCK_SIZE = 0.85;
         const LINE_WIDTH = 0.1;
         const OFFSET = (1 - BLOCK_SIZE) / 2;
         if (blocks === false) {
@@ -195,6 +195,22 @@ class Layer {
         this.orientation = orientation;
         this.color = color;
         this.values = new Array(this.rodCount).fill(0);
+        this.pct = 1.0;
+    }
+
+    computeValues(inputs) {
+        const values = new Array(this.rodCount);
+        for (let i = 0; i < this.rodCount; i++) {
+            let blocked = false;
+            for (let j = 0; j < inputs.length; j++) {
+                if (inputs[j] && this.rods[i][j]) {
+                    blocked = true;
+                    break;
+                }
+            }
+            values[i] = blocked ? 0 : 1;
+        }
+        return values;
     }
 
     setValues(values) {
@@ -203,13 +219,21 @@ class Layer {
         }
     }
 
+    getValues() {
+        return this.values;
+    }
+
+    setPct(pct) {
+        this.pct = pct;
+    }
+
     draw(artist, input = false) {
         for (let i = 0; i < this.rodCount; i++) {
             const drawBlocks = blocks => {
                 artist.drawBlocks(
                     this.orientation,
                     i,
-                    this.values[i],
+                    this.values[i] * this.pct,
                     blocks,
                     this.color
                 );
@@ -217,7 +241,12 @@ class Layer {
             if (input) {
                 drawBlocks(true);
             }
-            artist.drawRod(this.orientation, i, this.color, this.values[i]);
+            artist.drawRod(
+                this.orientation,
+                i,
+                this.color,
+                this.values[i] * this.pct
+            );
             if (!input) {
                 drawBlocks(this.rods[i]);
             }
@@ -254,11 +283,16 @@ async function renderOnCanvas(canvas) {
         inputLayer.draw(artist, true);
         ctx.restore();
     });
+
+    inputLayer.setValues([0, 0, 1, 0]);
     await animator.animate(500, pct => {
-        inputLayer.setValues([0, 0, pct, 0]);
+        inputLayer.setPct(pct);
     });
+
+    const outputValues = outputLayer.computeValues(inputLayer.getValues());
+    outputLayer.setValues(outputValues);
     await animator.animate(500, pct => {
-        outputLayer.setValues([pct, pct, pct, 0]);
+        outputLayer.setPct(pct);
     });
 }
 

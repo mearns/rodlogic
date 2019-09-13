@@ -277,52 +277,72 @@ class Layer {
 }
 
 async function renderOnCanvas(canvas) {
-    const width = canvas.width;
-    const height = canvas.height;
-    const ctx = canvas.getContext("2d");
     const rodCount = 4;
-    const artist = new RodArtist(ctx, rodCount);
-    const inputLayer = new Layer(rodCount, true, "#ccffcc");
-    const outputLayer = new Layer(
-        [
-            // prettier-ignore
-            [0, 0, 0, 0],
-            [0, 1, 0, 0],
-            [1, 0, 0, 0],
-            [1, 1, 1, 1]
-        ],
-        false,
-        "#ccccff"
-    );
+    const inputLayer = rodCount;
+    const outputLayer = [
+        // prettier-ignore
+        [0, 0, 0, 0],
+        [0, 1, 0, 0],
+        [1, 0, 0, 0],
+        [1, 1, 1, 1]
+    ];
+    const computer = new Computer(inputLayer, outputLayer);
+    await computer.animate(canvas, 500, [0, 1, 0, 0]);
+}
 
-    const animator = new Animator(() => {
-        ctx.clearRect(0, 0, width, height);
-        ctx.save();
-        ctx.scale(width / artist.cellCount, height / artist.cellCount);
-        ctx.font = `${100 / 10 / artist.cellCount}px serif`;
-        outputLayer.draw(artist);
-        inputLayer.draw(artist, true);
-        ctx.restore();
-    });
+class Computer {
+    constructor(...rodLayers) {
+        this.layers = rodLayers.map(
+            (rods, idx) =>
+                new Layer(rods, idx % 2 == 0, idx % 2 ? "#ccccff" : "#ccffcc")
+        );
+        this.rodCount = Math.max(...this.layers.map(layer => layer.rodCount));
+    }
 
-    inputLayer.setValues([0, 0, 1, 0]);
-    await animator.animate(500, pct => {
-        inputLayer.setPct(pct);
-    });
+    async animate(canvas, frameDuration, inputs) {
+        const width = canvas.width;
+        const height = canvas.height;
+        const ctx = canvas.getContext("2d");
+        const artist = new RodArtist(ctx, this.rodCount);
+        let i = 1;
+        const animator = new Animator(() => {
+            ctx.clearRect(0, 0, width, height);
+            ctx.save();
+            ctx.scale(width / artist.cellCount, height / artist.cellCount);
+            ctx.font = `${100 / 10 / artist.cellCount}px serif`;
+            this.layers[i].draw(artist);
+            this.layers[i - 1].draw(artist, true);
+            ctx.restore();
+        });
+        this.layers[0].setValues(inputs);
 
-    const outputValues = outputLayer.computeValues(inputLayer.getValues());
-    outputLayer.setValues(outputValues);
-    await animator.animate(500, pct => {
-        outputLayer.setPct(pct);
-    });
+        await animator.animate(frameDuration, pct => {
+            this.layers[0].setPct(pct);
+        });
 
-    // Fly out
-    await animator.animate(500, pct => inputLayer.setFlyout(pct));
+        const outputValues = this.layers[1].computeValues(
+            this.layers[0].getValues()
+        );
+        this.layers[1].setValues(outputValues);
+        await animator.animate(frameDuration, pct => {
+            this.layers[1].setPct(pct);
+        });
+        await animator.pause(frameDuration);
+
+        // Fly out
+        // await animator.animate(500, pct => inputLayer.setFlyout(pct));
+    }
 }
 
 class Animator {
     constructor(render) {
         this._render = render;
+    }
+
+    async pause(duration) {
+        return new Promise(resolve => {
+            setTimeout(resolve, duration);
+        });
     }
 
     async animate(duration, cb) {

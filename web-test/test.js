@@ -151,6 +151,9 @@ class RodArtist {
      * @param {string} color The color of the host rod.
      */
     drawBlocks(orientation, rodIndex, rodValue, blocks, color) {
+        const BLOCK_SIZE = 0.9;
+        const LINE_WIDTH = 0.1;
+        const OFFSET = (1 - BLOCK_SIZE) / 2;
         if (blocks === false) {
             return;
         }
@@ -167,11 +170,11 @@ class RodArtist {
                     this.ctx[method](
                         ...this.orientValues(
                             orientation,
-                            0.1 + (this.spacing * (i + 1) + 1),
-                            0.1
+                            OFFSET + (this.spacing * (i + 1) + 1),
+                            OFFSET
                         ),
-                        0.8,
-                        0.8
+                        BLOCK_SIZE,
+                        BLOCK_SIZE
                     );
                 });
             }
@@ -234,7 +237,7 @@ function renderOnCanvas(canvas) {
         false,
         "#ccccff"
     );
-    animate(2000, pct => {
+    animate(500, pct => {
         ctx.clearRect(0, 0, width, height);
         ctx.save();
         ctx.scale(width / artist.cellCount, height / artist.cellCount);

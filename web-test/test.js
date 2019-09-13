@@ -11,6 +11,16 @@ class RodArtist {
         this.cellCount = this.rodLength + MARGIN + MARGIN + 0.5 * MARGIN;
     }
 
+    withScale(scale, cb) {
+        const width = this.cellCount;
+        const offset = ((scale - 1) * -width) / 2;
+        this.ctx.save();
+        this.ctx.translate(offset, offset);
+        this.ctx.scale(scale, scale);
+        cb();
+        this.ctx.restore();
+    }
+
     /**
      * Given an orientation and a pair of vector components
      * along the length of the rod and the width of the rod, respectively,
@@ -196,6 +206,11 @@ class Layer {
         this.color = color;
         this.values = new Array(this.rodCount).fill(0);
         this.pct = 1.0;
+        this.flyout = 0;
+    }
+
+    setFlyout(flyout) {
+        this.flyout = flyout;
     }
 
     computeValues(inputs) {
@@ -228,30 +243,36 @@ class Layer {
     }
 
     draw(artist, input = false) {
-        for (let i = 0; i < this.rodCount; i++) {
-            const drawBlocks = blocks => {
-                artist.drawBlocks(
+        if (this.flyout >= 1.0) {
+            return;
+        }
+        const scale = Math.exp(3 * this.flyout);
+        artist.withScale(scale, () => {
+            for (let i = 0; i < this.rodCount; i++) {
+                const drawBlocks = blocks => {
+                    artist.drawBlocks(
+                        this.orientation,
+                        i,
+                        this.values[i] * this.pct,
+                        blocks,
+                        this.color
+                    );
+                };
+                if (input) {
+                    drawBlocks(true);
+                }
+                artist.drawRod(
                     this.orientation,
                     i,
-                    this.values[i] * this.pct,
-                    blocks,
-                    this.color
+                    this.color,
+                    this.values[i] * this.pct
                 );
-            };
-            if (input) {
-                drawBlocks(true);
+                if (!input) {
+                    drawBlocks(this.rods[i]);
+                }
             }
-            artist.drawRod(
-                this.orientation,
-                i,
-                this.color,
-                this.values[i] * this.pct
-            );
-            if (!input) {
-                drawBlocks(this.rods[i]);
-            }
-        }
-        artist.drawValueHighlight(this.orientation, this.color);
+            artist.drawValueHighlight(this.orientation, this.color);
+        });
     }
 }
 
@@ -265,10 +286,10 @@ async function renderOnCanvas(canvas) {
     const outputLayer = new Layer(
         [
             // prettier-ignore
-            [1, 1, 0, 0],
+            [0, 0, 0, 0],
+            [0, 1, 0, 0],
             [1, 0, 0, 0],
-            [0, 0, 0, 1],
-            [1, 0, 1, 1]
+            [1, 1, 1, 1]
         ],
         false,
         "#ccccff"
@@ -294,6 +315,9 @@ async function renderOnCanvas(canvas) {
     await animator.animate(500, pct => {
         outputLayer.setPct(pct);
     });
+
+    // Fly out
+    await animator.animate(500, pct => inputLayer.setFlyout(pct));
 }
 
 class Animator {

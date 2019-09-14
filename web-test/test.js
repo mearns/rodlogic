@@ -301,87 +301,146 @@ class Computer {
             this.layers[currentLayer - 1].draw(artist, true);
             ctx.restore();
         };
-        const sequence = new Sequence();
+        const steps = [];
 
-        sequence.addStep(
-            `Setting inputs to ${inputs}`,
-            () => {
-                this.layers[0].setValues(inputs);
-            },
-            pct => {
-                this.layers[0].setPct(pct);
-            }
+        steps.push(
+            new SingleStep(
+                `Setting inputs to ${inputs}`,
+                () => {
+                    this.layers[0].setValues(inputs);
+                },
+                pct => {
+                    this.layers[0].setPct(pct);
+                }
+            )
         );
 
         for (let _i = 1; _i < this.layers.length; _i++) {
             const i = _i;
+            const stepsForLayer = [];
             if (i > 1) {
-                sequence.addStep(`Next layer (${i})`, () => {
-                    drawBlocksForNext = false;
-                    currentLayer = i;
-                });
+                stepsForLayer.push(
+                    new SingleStep(`Next layer (${i})`, () => {
+                        drawBlocksForNext = false;
+                        currentLayer = i;
+                    })
+                );
             }
 
-            sequence.addStep(
-                "Push output layer to compute values",
-                () => {
-                    this.layers[i].setValues(
-                        this.layers[i].computeValues(
-                            this.layers[i - 1].getValues()
-                        )
-                    );
-                },
-                pct => {
-                    this.layers[i].setPct(pct);
-                }
+            stepsForLayer.push(
+                new SingleStep(
+                    "Push output layer to compute values",
+                    () => {
+                        this.layers[i].setValues(
+                            this.layers[i].computeValues(
+                                this.layers[i - 1].getValues()
+                            )
+                        );
+                    },
+                    pct => {
+                        this.layers[i].setPct(pct);
+                    }
+                )
             );
 
             // Fly out
             if (i + 1 < this.layers.length) {
-                sequence.addStep("Shed layer", null, pct => {
-                    this.layers[i - 1].setFlyout(pct);
-                });
-                sequence.addStep(
-                    "Output layer becomes the next input layer (hide gates and show blocks)",
-                    () => {
-                        drawBlocksForNext = true;
-                    }
+                stepsForLayer.push(
+                    new SingleStep("Shed layer", null, pct => {
+                        this.layers[i - 1].setFlyout(pct);
+                    })
+                );
+
+                stepsForLayer.push(
+                    new SingleStep(
+                        "Output layer becomes the next input layer (hide gates and show blocks)",
+                        () => {
+                            drawBlocksForNext = true;
+                        }
+                    )
                 );
             }
+            steps.push(new Step(...stepsForLayer));
         }
 
-        return new SequenceRunner(sequence, render, duration);
+        return new SequenceRunner(new Step(...steps), render, duration);
     }
 }
 
-class Sequence {
-    constructor() {
-        this.steps = [];
-    }
-
-    addStep(description, setup = () => {}, update = () => {}, duration = 1) {
-        this.steps.push([description, setup, update, duration]);
+class SingleStep {
+    constructor(
+        description,
+        setup = () => {},
+        update = () => {},
+        duration = 1
+    ) {
+        this.description = description;
+        this.setup = setup;
+        this.update = update;
+        this.duration = duration;
     }
 
     getStepper() {
-        let current = 0;
+        let done = false;
         return {
-            getCurrent: () => this.steps[current],
+            getCurrent: () =>
+                done
+                    ? null
+                    : [
+                          this.description,
+                          this.setup,
+                          this.update,
+                          this.duration
+                      ],
 
             step: () => {
-                if (current < this.steps.length) {
-                    current++;
-                    return current < this.steps.length;
-                }
+                done = true;
                 return false;
             }
         };
     }
 }
 
+class Step {
+    constructor(...substeps) {
+        this.steps = substeps;
+    }
+
+    getStepper() {
+        let currentIdx = 0;
+        const steppers = this.steps.map(step => step.getStepper());
+        const getCurrent = () => {
+            const current = steppers[currentIdx];
+            if (current) {
+                return current.getCurrent();
+            }
+            return null;
+        };
+
+        return {
+            getCurrent,
+
+            step: () => {
+                while (true) {
+                    const current = steppers[currentIdx];
+                    if (!current) {
+                        return false;
+                    }
+                    const hasNext = current.step();
+                    if (hasNext) {
+                        return true;
+                    }
+                    currentIdx++;
+                    return getCurrent() !== null;
+                }
+            }
+        };
+    }
+}
+
 class SequenceRunner {
-    constructor(sequence, render, standardDuration) {
-        this._stepper = sequence.getStepper();
+    constructor(topStep, render, standardDuration) {
+        this._stepper = topStep.getStepper();
         this._standardDuration = standardDuration;
         this._renderPending = false;
         this._render = () => {

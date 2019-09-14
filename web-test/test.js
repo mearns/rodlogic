@@ -285,112 +285,149 @@ class Computer {
         this.rodCount = Math.max(...this.layers.map(layer => layer.rodCount));
     }
 
-    async animate(canvas, frameDuration, inputs, ready) {
-        const width = canvas.width;
-        const height = canvas.height;
+    getSequenceRunner(canvas, duration, inputs) {
+        let currentLayer = 1;
+        let drawBlocksForNext = false;
         const ctx = canvas.getContext("2d");
         const artist = new RodArtist(ctx, this.rodCount);
-        let i = 1;
-        let drawBlocksForNext = false;
-        const animator = new Animator(() => {
+        const render = () => {
+            const width = canvas.width;
+            const height = canvas.height;
             ctx.clearRect(0, 0, width, height);
             ctx.save();
             ctx.scale(width / artist.cellCount, height / artist.cellCount);
             ctx.font = `${100 / 10 / artist.cellCount}px serif`;
-            this.layers[i].draw(artist, drawBlocksForNext);
-            this.layers[i - 1].draw(artist, true);
+            this.layers[currentLayer].draw(artist, drawBlocksForNext);
+            this.layers[currentLayer - 1].draw(artist, true);
             ctx.restore();
-        });
-        ready = ready || (() => animator.pause(frameDuration));
-
-        const step = async (description, cb) => {
-            console.log(description);
-            await cb();
-            await ready();
         };
+        const sequence = new Sequence();
 
-        await animator.draw();
-        await ready();
+        sequence.addStep(
+            `Setting inputs to ${inputs}`,
+            () => {
+                this.layers[0].setValues(inputs);
+            },
+            pct => {
+                this.layers[0].setPct(pct);
+            }
+        );
 
-        await step(`Seting inputs to ${inputs}`, async () => {
-            this.layers[0].setValues(inputs);
-            await animator.animate(frameDuration, pct => {
-                this.layers[i - 1].setPct(pct);
-            });
-        });
-
-        for (i = i; i < this.layers.length; i++) {
+        for (let _i = 1; _i < this.layers.length; _i++) {
+            const i = _i;
             if (i > 1) {
-                await step("Next layer", async () => {
+                sequence.addStep(`Next layer (${i})`, () => {
                     drawBlocksForNext = false;
-                    await animator.draw();
+                    currentLayer = i;
                 });
             }
 
-            const computedValues = this.layers[i].computeValues(
-                this.layers[i - 1].getValues()
-            );
-            await step(
-                `Push output layer to compute value: ${computedValues}`,
-                async () => {
-                    this.layers[i].setValues(computedValues);
-                    await animator.animate(frameDuration, pct => {
-                        this.layers[i].setPct(pct);
-                    });
+            sequence.addStep(
+                "Push output layer to compute values",
+                () => {
+                    this.layers[i].setValues(
+                        this.layers[i].computeValues(
+                            this.layers[i - 1].getValues()
+                        )
+                    );
+                },
+                pct => {
+                    this.layers[i].setPct(pct);
                 }
             );
 
             // Fly out
             if (i + 1 < this.layers.length) {
-                await step("Shed layer", async () => {
-                    await animator.animate(frameDuration, pct =>
-                        this.layers[i - 1].setFlyout(pct)
-                    );
+                sequence.addStep("Shed layer", null, pct => {
+                    this.layers[i - 1].setFlyout(pct);
                 });
-                await step(
+                sequence.addStep(
                     "Output layer becomes the next input layer (hide gates and show blocks)",
-                    async () => {
+                    () => {
                         drawBlocksForNext = true;
-                        animator.draw();
                     }
                 );
             }
         }
+
+        return new SequenceRunner(sequence, render, duration);
     }
 }
 
-class Animator {
-    constructor(render) {
-        this._render = render;
+class Sequence {
+    constructor() {
+        this.steps = [];
     }
 
-    async pause(duration) {
-        this._render();
-        return new Promise(resolve => {
-            setTimeout(resolve, duration);
-        });
+    addStep(description, setup = () => {}, update = () => {}, duration = 1) {
+        this.steps.push([description, setup, update, duration]);
     }
 
-    async draw() {
-        this._render();
+    getStep(i) {
+        return this.steps[i];
     }
 
-    async animate(duration, cb) {
+    stepCount() {
+        return this.steps.length;
+    }
+}
+
+class SequenceRunner {
+    constructor(sequence, render, standardDuration) {
+        this._i = 0;
+        this._standardDuration = standardDuration;
+        this._sequence = sequence;
+        this._renderPending = false;
+        this._render = () => {
+            this._renderPending = false;
+            render();
+        };
+    }
+
+    async runThis(setup, update, duration) {
         return new Promise(resolve => {
             const startTime = new Date().getTime();
             const drawFrame = () => {
                 const elapsedTimed = new Date() - startTime;
                 const pct = elapsedTimed / duration;
-                cb(pct > 1 ? 1 : pct);
+                update && update(pct > 1 ? 1 : pct);
                 this._render();
                 if (pct < 1) {
+                    this._renderPending = true;
                     requestAnimationFrame(drawFrame);
                 } else {
                     resolve();
                 }
             };
+            setup && setup();
+            update && update(0);
+            this._renderPending = true;
             requestAnimationFrame(drawFrame);
         });
+    }
+
+    refresh() {
+        if (!this._renderPending) {
+            this._renderPending = true;
+            requestAnimationFrame(this._render);
+        }
+    }
+
+    async runNext() {
+        if (this._i < this._sequence.stepCount()) {
+            const [
+                description,
+                setup,
+                update,
+                timeScale
+            ] = this._sequence.getStep(this._i);
+            console.log(description);
+            this._i++;
+            const duration = this._standardDuration * timeScale;
+            await this.runThis(setup, update, duration);
+            return false;
+        }
+        return true;
     }
 }
 
@@ -398,11 +435,6 @@ async function main() {
     const canvas = document.getElementById("canvas");
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
-    const ready = () => {
-        return new Promise(resolve => {
-            window.addEventListener("keypress", resolve, { once: true });
-        });
-    };
     const computer = new Computer(
         4,
         // prettier-ignore
@@ -418,8 +450,19 @@ async function main() {
             [0, 0, 0, 0]
         ]
     );
-    await computer.animate(canvas, 500, [0, 1, 0, 0], ready);
-    console.log("Done");
+    const runner = computer.getSequenceRunner(canvas, 500, [0, 1, 0, 0]);
+    await new Promise(resolve => {
+        const keyListener = async () => {
+            const done = await runner.runNext();
+            if (done) {
+                window.removeEventListener("keypress", keyListener);
+                console.log("done");
+                resolve();
+            }
+        };
+        window.addEventListener("keypress", keyListener);
+        runner.refresh();
+    });
 }
 
 let resized = false;
@@ -428,6 +471,7 @@ window.addEventListener("resize", () => {
         resized = true;
         window.requestAnimationFrame(() => {
             resized = false;
+            // FIXME: Don't start over, just fix the scale.:
             main();
         });
     }

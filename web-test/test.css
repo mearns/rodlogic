@@ -6,3 +6,11 @@ canvas#canvas {
     margin: auto;
     border: 1px solid black;
 }
+
+#console {
+    float: right;
+    border: 1px solid black;
+    position: absolute;
+    right: 0;
+    padding: 0;
+}

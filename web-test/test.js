@@ -516,6 +516,8 @@ class SequenceRunner {
 
 async function main() {
     const canvas = document.getElementById("canvas");
+    const outputPanel = document.getElementById("console");
+    const outputList = document.getElementById("output");
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     const computer = new Computer(
@@ -543,33 +545,47 @@ async function main() {
     const runner = computer.getSequenceRunner(canvas, 500, [0, 1, 0, 0]);
 
     let resized = false;
-    window.addEventListener("resize", () => {
+    const setSize = () => {
         if (!resized) {
             resized = true;
             window.requestAnimationFrame(() => {
                 resized = false;
                 canvas.width = canvas.clientWidth;
                 canvas.height = canvas.clientHeight;
+                const availableSpace =
+                    (window.innerWidth - canvas.clientWidth) / 2;
+                const usedSpace = availableSpace * 0.9;
+                const margins = (availableSpace - usedSpace) / 2;
+                outputPanel.style.width = `${usedSpace}px`;
+                outputPanel.style.right = `${margins}px`;
                 runner.refresh();
             });
         }
-    });
+    };
+    window.addEventListener("resize", setSize);
+    setSize();
+
+    const appendToOutput = text => {
+        const li = document.createElement("li");
+        li.appendChild(document.createTextNode(text));
+        outputList.appendChild(li);
+    };
 
     await new Promise(resolve => {
         const keyListener = async () => {
             const done = await runner.step();
             if (done) {
                 window.removeEventListener("keypress", keyListener);
-                console.log("done");
+                appendToOutput("done");
                 resolve();
             } else {
                 const { path, description } = runner.getCurrentStep();
-                console.log(`Next step ${path}: ${description}`);
+                appendToOutput(`Next step ${path}: ${description}`);
             }
         };
         window.addEventListener("keypress", keyListener);
         const { path, description } = runner.getCurrentStep();
-        console.log(`First step ${path}: ${description}`);
+        appendToOutput(`First step ${path}: ${description}`);
         runner.refresh();
     });
 }

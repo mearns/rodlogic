@@ -531,6 +531,13 @@ async function main() {
         [
             [0, 1, 1, 1],
             [0, 0, 0, 0]
+        ],
+        // prettier-ignore
+        [
+            [1, 0, 0, 1],
+            [1, 1, 1, 1],
+            [0, 1, 0, 0],
+            [1, 0, 1, 0]
         ]
     );
     const runner = computer.getSequenceRunner(canvas, 500, [0, 1, 0, 0]);

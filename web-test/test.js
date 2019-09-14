@@ -207,10 +207,17 @@ class Layer {
         this.values = new Array(this.rodCount).fill(0);
         this.pct = 1.0;
         this.flyout = 0;
+        this.flyin = 1;
     }
 
     setFlyout(flyout) {
+        this.flyin = 1;
         this.flyout = flyout;
+    }
+
+    setFlyin(flyin) {
+        this.flyout = 0;
+        this.flyin = flyin;
     }
 
     computeValues(inputs) {
@@ -243,10 +250,10 @@ class Layer {
     }
 
     draw(artist, input = false) {
-        if (this.flyout >= 1.0) {
+        if (this.flyout >= 1.0 || this.flyin <= 0) {
             return;
         }
-        const scale = Math.exp(3 * this.flyout);
+        const scale = Math.exp(3 * this.flyout) * this.flyin;
         artist.withScale(scale, () => {
             for (let i = 0; i < this.rodCount; i++) {
                 const drawBlocks = blocks => {
@@ -320,10 +327,16 @@ class Computer {
             const stepsForLayer = [];
             if (i > 1) {
                 stepsForLayer.push(
-                    new SingleStep(`Next layer (${i})`, () => {
-                        drawBlocksForNext = false;
-                        currentLayer = i;
-                    })
+                    new SingleStep(
+                        `Next layer (${i})`,
+                        () => {
+                            drawBlocksForNext = false;
+                            currentLayer = i;
+                        },
+                        pct => {
+                            this.layers[i].setFlyin(pct);
+                        }
+                    )
                 );
             }
 

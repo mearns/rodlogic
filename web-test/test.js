@@ -363,25 +363,39 @@ class Sequence {
         this.steps.push([description, setup, update, duration]);
     }
 
-    getStep(i) {
-        return this.steps[i];
-    }
+    getStepper() {
+        let current = 0;
+        return {
+            getCurrent: () => this.steps[current],
 
-    stepCount() {
-        return this.steps.length;
+            step: () => {
+                if (current < this.steps.length) {
+                    current++;
+                    return current < this.steps.length;
+                }
+                return false;
+            }
+        };
     }
 }
 
 class SequenceRunner {
     constructor(sequence, render, standardDuration) {
-        this._i = 0;
+        this._stepper = sequence.getStepper();
         this._standardDuration = standardDuration;
-        this._sequence = sequence;
         this._renderPending = false;
         this._render = () => {
             this._renderPending = false;
             render();
         };
+    }
+
+    getCurrentStep() {
+        const step = this._stepper.getCurrent();
+        if (step) {
+            return { idx: this._i, description: step.description };
+        }
+        return null;
     }
 
     async runThis(setup, update, duration) {
@@ -413,19 +427,14 @@ class SequenceRunner {
         }
     }
 
-    async runNext() {
-        if (this._i < this._sequence.stepCount()) {
-            const [
-                description,
-                setup,
-                update,
-                timeScale
-            ] = this._sequence.getStep(this._i);
-            console.log(description);
-            this._i++;
+    async step() {
+        const current = this._stepper.getCurrent();
+        if (current) {
+            const [, setup, update, timeScale] = current;
+            const hasNext = this._stepper.step();
             const duration = this._standardDuration * timeScale;
             await this.runThis(setup, update, duration);
-            return this._i >= this._sequence.stepCount();
+            return !hasNext;
         }
         return true;
     }
@@ -467,7 +476,7 @@ async function main() {
 
     await new Promise(resolve => {
         const keyListener = async () => {
-            const done = await runner.runNext();
+            const done = await runner.step();
             if (done) {
                 window.removeEventListener("keypress", keyListener);
                 console.log("done");

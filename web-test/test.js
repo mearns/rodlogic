@@ -383,10 +383,11 @@ class SingleStep {
     getStepper() {
         let done = false;
         return {
-            getCurrent: () =>
+            getCurrent: path =>
                 done
                     ? null
                     : [
+                          path,
                           this.description,
                           this.setup,
                           this.update,
@@ -409,10 +410,10 @@ class Step {
     getStepper() {
         let currentIdx = 0;
         const steppers = this.steps.map(step => step.getStepper());
-        const getCurrent = () => {
+        const getCurrent = (path = []) => {
             const current = steppers[currentIdx];
             if (current) {
-                return current.getCurrent();
+                return current.getCurrent([...path, currentIdx]);
             }
             return null;
         };
@@ -452,7 +453,8 @@ class SequenceRunner {
     getCurrentStep() {
         const step = this._stepper.getCurrent();
         if (step) {
-            return { idx: this._i, description: step.description };
+            const [path, description] = step;
+            return { path, description };
         }
         return null;
     }
@@ -489,7 +491,7 @@ class SequenceRunner {
     async step() {
         const current = this._stepper.getCurrent();
         if (current) {
-            const [, setup, update, timeScale] = current;
+            const [, , setup, update, timeScale] = current;
             const hasNext = this._stepper.step();
             const duration = this._standardDuration * timeScale;
             await this.runThis(setup, update, duration);
@@ -540,9 +542,14 @@ async function main() {
                 window.removeEventListener("keypress", keyListener);
                 console.log("done");
                 resolve();
+            } else {
+                const { path, description } = runner.getCurrentStep();
+                console.log(`Next step ${path}: ${description}`);
             }
         };
         window.addEventListener("keypress", keyListener);
+        const { path, description } = runner.getCurrentStep();
+        console.log(`First step ${path}: ${description}`);
         runner.refresh();
     });
 }

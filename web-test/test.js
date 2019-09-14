@@ -425,7 +425,7 @@ class SequenceRunner {
             this._i++;
             const duration = this._standardDuration * timeScale;
             await this.runThis(setup, update, duration);
-            return false;
+            return this._i >= this._sequence.stepCount();
         }
         return true;
     }
@@ -451,6 +451,20 @@ async function main() {
         ]
     );
     const runner = computer.getSequenceRunner(canvas, 500, [0, 1, 0, 0]);
+
+    let resized = false;
+    window.addEventListener("resize", () => {
+        if (!resized) {
+            resized = true;
+            window.requestAnimationFrame(() => {
+                resized = false;
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                runner.refresh();
+            });
+        }
+    });
+
     await new Promise(resolve => {
         const keyListener = async () => {
             const done = await runner.runNext();
@@ -465,15 +479,4 @@ async function main() {
     });
 }
 
-let resized = false;
-window.addEventListener("resize", () => {
-    if (!resized) {
-        resized = true;
-        window.requestAnimationFrame(() => {
-            resized = false;
-            // FIXME: Don't start over, just fix the scale.:
-            main();
-        });
-    }
-});
 main();
